@@ -1,0 +1,10 @@
+{
+  "name": "rigid2d",
+  "version": "0.1.0",
+  "homepage": "https://github.com/yutongz1997/neural-rbcd",
+  "description": "A simple, lightweight physics-based rigid body simulator in 2D",
+  "dependencies": [
+    "fmt",
+    "eigen3"
+  ]
+}
