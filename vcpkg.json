@@ -6,6 +6,7 @@
   "dependencies": [
     "fmt",
     "eigen3",
+    "nlohmann-json",
     {
       "name": "glad",
       "features": ["gl-api-41"]

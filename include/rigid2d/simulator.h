@@ -7,6 +7,7 @@
 #include <GLFW/glfw3.h>
 
 #include "rigid2d/common.h"
+#include "rigid2d/scene.h"
 #include "rigid2d/shader.h"
 #include "rigid2d/geometry.h"
 
@@ -17,9 +18,7 @@ class Simulator {
 private:
     GLFWwindow* window_;
 
-    std::unique_ptr<Shader> shader_;
-
-    std::shared_ptr<TriangleMesh> geometry_;
+    std::unique_ptr<Scene> scene_;
 
 private:
     bool InitWindow(int width, int height);
@@ -27,14 +26,12 @@ private:
 
     void ProcessKeyboardInput();
 
-    void Render(const std::shared_ptr<TriangleMesh>& geometry);
-
 public:
-    Simulator(int width, int height);
+    Simulator(int width, int height, const std::string& scene_path);
 
     ~Simulator();
 
-    void Run(const std::shared_ptr<TriangleMesh>& geometry);
+    void Run();
 };
 
 RIGID2D_NAMESPACE_END

@@ -71,7 +71,6 @@ private:
 
     std::vector<GLfloat> buffer_vertices_;
     std::vector<GLuint> buffer_indices_;
-    GLuint vao_;
 
 private:
     void MakeVertices();
@@ -106,8 +105,6 @@ public:
     [[nodiscard]] inline std::vector<GLuint> IndexBufferData() const {
         return buffer_indices_;
     }
-
-    void Render(const Shader& shader) const;
 
     friend std::ostream& operator<<(std::ostream& os,
                                     const TriangleMesh& mesh) {

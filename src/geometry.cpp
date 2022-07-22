@@ -18,7 +18,6 @@ RIGID2D_NAMESPACE_BEGIN
 TriangleMesh::TriangleMesh(const std::string& name, const std::string& path) {
     name_ = name;
     loaded_ = true;
-    vao_ = 0;
 
     std::ifstream file(path);
     std::string line;
@@ -102,23 +101,6 @@ TriangleMesh::TriangleMesh(const std::string& name, const std::string& path) {
                        [](const std::shared_ptr<Triangle> &trig) { return trig->area; });
         // Compute the total area of the triangle mesh
         area_ = std::accumulate(areas_.begin(), areas_.end(), 0.0f);
-
-        // Generate the OpenGL vertex array (VAO) and buffers (VBO, IBO)
-        glGenVertexArrays(1, &vao_);
-        GLuint vbo, ibo;
-        glGenBuffers(1, &vbo);
-        glGenBuffers(1, &ibo);
-        // Populate vertices and indices data into the VBO and IBO
-        glBindVertexArray(vao_);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(buffer_vertices_.size() * sizeof(GLfloat)),
-                     &buffer_vertices_[0], GL_STATIC_DRAW);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), nullptr);
-        glEnableVertexAttribArray(0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(buffer_indices_.size() * sizeof(GLuint)),
-                     &buffer_indices_[0], GL_STATIC_DRAW);
-        glBindVertexArray(0);
     }
 }
 
@@ -157,15 +139,6 @@ void TriangleMesh::CleanUp() {
 
     buffer_vertices_.clear();
     buffer_indices_.clear();
-}
-
-
-void TriangleMesh::Render(const Shader& shader) const {
-    shader.Use();
-    glBindVertexArray(vao_);
-    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(buffer_indices_.size()),
-                   GL_UNSIGNED_INT, nullptr);
-    glBindVertexArray(0);
 }
 
 RIGID2D_NAMESPACE_END

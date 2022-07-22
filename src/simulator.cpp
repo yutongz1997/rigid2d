@@ -48,12 +48,7 @@ void Simulator::ProcessKeyboardInput() {
 }
 
 
-void Simulator::Render(const std::shared_ptr<TriangleMesh>& geometry) {
-    geometry->Render(*shader_);
-}
-
-
-Simulator::Simulator(int width, int height) {
+Simulator::Simulator(int width, int height, const std::string& scene_path) {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
@@ -67,17 +62,7 @@ Simulator::Simulator(int width, int height) {
     window_ = nullptr;
     InitWindow(width, height);
 
-    std::string vert = "#version 410 core\n"
-                       "layout (location = 0) in vec3 v_position;\n"
-                       "void main() {\n"
-                       "    gl_Position = vec4(v_position, 1.0f);\n"
-                       "}";
-    std::string frag = "#version 410 core\n"
-                       "out vec4 frag_color;\n"
-                       "void main() {\n"
-                       "    frag_color = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
-                       "}";
-    shader_ = std::make_unique<Shader>(vert, frag);
+    scene_ = std::make_unique<Scene>(scene_path);
 }
 
 
@@ -87,7 +72,7 @@ Simulator::~Simulator() {
 }
 
 
-void Simulator::Run(const std::shared_ptr<TriangleMesh>& geometry) {
+void Simulator::Run() {
     if (!window_) {
         return;
     }
@@ -100,7 +85,7 @@ void Simulator::Run(const std::shared_ptr<TriangleMesh>& geometry) {
         glEnable(GL_DEPTH_TEST);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        Render(geometry);
+        scene_->Render();
 
         glfwSwapBuffers(window_);
     }
