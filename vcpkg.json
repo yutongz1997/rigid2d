@@ -5,6 +5,11 @@
   "description": "A simple, lightweight physics-based rigid body simulator in 2D",
   "dependencies": [
     "fmt",
-    "eigen3"
+    "eigen3",
+    {
+      "name": "glad",
+      "features": ["gl-api-41"]
+    },
+    "glfw3"
   ]
 }

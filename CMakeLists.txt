@@ -15,6 +15,8 @@ endif()
 
 find_package(fmt CONFIG REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
+find_package(glad CONFIG REQUIRED)
+find_package(glfw3 CONFIG REQUIRED)
 
 # Enable math constants when compiling with Microsoft Visual C++
 if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
@@ -25,9 +27,16 @@ endif()
 set(PROJECT_HEADER_DIR "${CMAKE_SOURCE_DIR}/include")
 set(PROJECT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
 set(SOURCE_FILES
+        "src/shader.cpp"
+        "src/geometry.cpp"
+        "src/bvh.cpp"
+        "src/simulator.cpp"
         "src/main.cpp"
 )
+
 add_executable(rigid2d ${SOURCE_FILES})
 target_include_directories(rigid2d PRIVATE ${PROJECT_HEADER_DIR})
 target_link_libraries(rigid2d PRIVATE fmt::fmt
-                                      Eigen3::Eigen)
+                                      Eigen3::Eigen
+                                      glad::glad
+                                      glfw)
