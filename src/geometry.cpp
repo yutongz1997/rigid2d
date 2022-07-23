@@ -4,6 +4,7 @@
 #include <memory>
 #include <algorithm>
 #include <numeric>
+#include <random>
 
 #include <fmt/core.h>
 
@@ -14,6 +15,124 @@
 
 
 RIGID2D_NAMESPACE_BEGIN
+
+Circle TwoVerticesCircle(const std::shared_ptr<Vertex>& v1,
+                         const std::shared_ptr<Vertex>& v2) {
+    Eigen::Vector2f center { 0.5f * (v1->x + v2->x),
+                             0.5f * (v1->y + v2->y) };
+    float radius = v1->distance(center);
+    return { center, radius };
+}
+
+
+Circle ThreeVerticesCircle(const std::shared_ptr<Vertex>& v1,
+                           const std::shared_ptr<Vertex>& v2,
+                           const std::shared_ptr<Vertex>& v3) {
+    float a = v2->x - v1->x;
+    float b = v2->y - v1->y;
+    float c = v3->x - v1->x;
+    float d = v3->y - v1->y;
+    float e = a * (v2->x + v1->x) * 0.5f + b * (v2->y + v1->y) * 0.5f;
+    float f = c * (v3->x + v1->x) * 0.5f + d * (v3->y + v1->y) * 0.5f;
+    float det = a * d - b * c;
+    // In case the three given vertices are co-linear, the enclosing circle is
+    // degenerate and only passes through two vertices
+    if (det == 0) {
+        float d12 = v1->distance(*v2);
+        float d23 = v2->distance(*v3);
+        float d13 = v1->distance(*v3);
+        if (d12 > d23 && d12 > d13) {
+            return TwoVerticesCircle(v1, v2);
+        } else if (d23 > d13) {
+            return TwoVerticesCircle(v2, v3);
+        }
+        return TwoVerticesCircle(v1, v3);
+    } else {
+        Eigen::Vector2f center { (d * e - b * f) / det,
+                                 (-c * e + a * f) / det };
+        float radius = v1->distance(center);
+        return { center, radius };
+    }
+}
+
+Circle MinimumEnclosingCircle(const std::vector<std::shared_ptr<Vertex>>& inputs,
+                              std::size_t num_inputs,
+                              std::vector<std::shared_ptr<Vertex>>& support,
+                              std::size_t support_size) {
+    // Compute an exact circle in terminal cases
+    if (support_size == 3) {
+        return ThreeVerticesCircle(support[0], support[1], support[2]);
+    } else if (num_inputs == 1 && support_size == 0) {
+        Eigen::Vector2f center { inputs[0]->x, inputs[0]->y };
+        return { center, 0.0f };
+    } else if (num_inputs == 0 && support_size == 2) {
+        return TwoVerticesCircle(support[0], support[1]);
+    } else if (num_inputs == 1 && support_size == 1) {
+        return TwoVerticesCircle(support[0], inputs[0]);
+    } else {
+        // Recursively compute the minimum enclosing circle of the remaining vertices
+        Circle mec = MinimumEnclosingCircle(inputs, num_inputs - 1, support, support_size);
+        // Pick the last vertex of the input set, and if that vertex lies inside the
+        // circle, it is indeed the minimum
+        std::size_t idx = num_inputs - 1;
+        if (mec.IsInCircle(*inputs[idx])) {
+            return mec;
+        }
+        // Otherwise, update the set of support to additionally contain the new vertex
+        support[support_size] = inputs[idx];
+        return MinimumEnclosingCircle(inputs, num_inputs - 1, support, support_size + 1);
+    }
+}
+
+
+Circle Circle::WelzlCircle(const std::vector<std::shared_ptr<Vertex>> &vertices) {
+    // Copy and shuffle the list of vertex pointers first
+    std::random_device rd;
+    std::mt19937 rng(rd());
+    std::vector<std::shared_ptr<Vertex>> vertices_copy(vertices);
+    std::shuffle(vertices_copy.begin(), vertices_copy.end(), rng);
+    // Recursively compute the minimum enclosing circle of the given vertices
+    std::vector<std::shared_ptr<Vertex>> support(3);
+    return MinimumEnclosingCircle(vertices_copy, vertices_copy.size(), support, 0);
+}
+
+
+void TriangleMesh::MakeVertices() {
+    std::size_t num_vertices = buffer_vertices_.size() / 2;
+    vertices_ = std::vector<std::shared_ptr<Vertex>>(num_vertices);
+    for (int i = 0; i < num_vertices; ++i) {
+        float x = buffer_vertices_[2 * i];
+        float y = buffer_vertices_[2 * i + 1];
+        vertices_[i] = std::make_shared<Vertex>(x, y);
+        vertices_[i]->index = i;
+    }
+}
+
+
+void TriangleMesh::MakeTriangles() {
+    for (int i = 0; i < buffer_indices_.size(); i += 3) {
+        std::shared_ptr<Vertex> v1 = vertices_[buffer_indices_[i]];
+        std::shared_ptr<Vertex> v2 = vertices_[buffer_indices_[i + 1]];
+        std::shared_ptr<Vertex> v3 = vertices_[buffer_indices_[i + 2]];
+        triangles_.push_back(std::make_shared<Triangle>(v1, v2, v3));
+    }
+}
+
+
+void TriangleMesh::CleanUp() {
+    name_ = "";
+    loaded_ = false;
+
+    vertices_.clear();
+    triangles_.clear();
+    centroids_.clear();
+    areas_.clear();
+    area_ = 0.0f;
+
+    buffer_vertices_.clear();
+    buffer_indices_.clear();
+}
+
 
 TriangleMesh::TriangleMesh(const std::string& name, const std::string& path) {
     name_ = name;
@@ -102,43 +221,6 @@ TriangleMesh::TriangleMesh(const std::string& name, const std::string& path) {
         // Compute the total area of the triangle mesh
         area_ = std::accumulate(areas_.begin(), areas_.end(), 0.0f);
     }
-}
-
-
-void TriangleMesh::MakeVertices() {
-    std::size_t num_vertices = buffer_vertices_.size() / 2;
-    vertices_ = std::vector<std::shared_ptr<Vertex>>(num_vertices);
-    for (int i = 0; i < num_vertices; ++i) {
-        float x = buffer_vertices_[2 * i];
-        float y = buffer_vertices_[2 * i + 1];
-        vertices_[i] = std::make_shared<Vertex>(x, y);
-        vertices_[i]->index = i;
-    }
-}
-
-
-void TriangleMesh::MakeTriangles() {
-    for (int i = 0; i < buffer_indices_.size(); i += 3) {
-        std::shared_ptr<Vertex> v1 = vertices_[buffer_indices_[i]];
-        std::shared_ptr<Vertex> v2 = vertices_[buffer_indices_[i + 1]];
-        std::shared_ptr<Vertex> v3 = vertices_[buffer_indices_[i + 2]];
-        triangles_.push_back(std::make_shared<Triangle>(v1, v2, v3));
-    }
-}
-
-
-void TriangleMesh::CleanUp() {
-    name_ = "";
-    loaded_ = false;
-
-    vertices_.clear();
-    triangles_.clear();
-    centroids_.clear();
-    areas_.clear();
-    area_ = 0.0f;
-
-    buffer_vertices_.clear();
-    buffer_indices_.clear();
 }
 
 RIGID2D_NAMESPACE_END

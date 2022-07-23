@@ -30,9 +30,50 @@ struct Vertex {
         index = -1;
     }
 
-    inline explicit operator Eigen::Vector2f() const {
-        return { x, y };
+    [[nodiscard]] inline float dot(const Vertex& other) const {
+        return x * other.x + y * other.y;
     }
+
+    [[nodiscard]] inline float distanceSquared(const Vertex& other) const {
+        return dot(other);
+    }
+
+    [[nodiscard]] inline float distanceSquared(const Eigen::Vector2f& other) const {
+        float dx = other.x() - x;
+        float dy = other.y() - y;
+        return dx * dx + dy * dy;
+    }
+
+    [[nodiscard]] inline float distance(const Vertex& other) const {
+        return std::sqrt(distanceSquared(other));
+    }
+
+    [[nodiscard]] inline float distance(const Eigen::Vector2f& other) const {
+        return std::sqrt(distanceSquared(other));
+    }
+};
+
+
+struct Circle {
+    // Center position (in world coordinates) of the circle
+    Eigen::Vector2f center;
+    // Radius of the circle
+    float radius;
+
+    Circle() : center({0, 0}), radius(1.0f) { }
+
+    Circle(const Eigen::Vector2f& center, float radius)
+        : center(center), radius(radius) { }
+
+    [[nodiscard]] inline bool IsInCircle(const Vertex& p) const {
+        return p.distanceSquared(center) <= radius * radius;
+    }
+
+    [[nodiscard]] inline bool IsInCircle(const Eigen::Vector2f& p) const {
+        return (p - center).squaredNorm() <= radius * radius;
+    }
+
+    static Circle WelzlCircle(const std::vector<std::shared_ptr<Vertex>>& vertices);
 };
 
 

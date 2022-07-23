@@ -12,13 +12,14 @@ RIGID2D_NAMESPACE_BEGIN
 
 class BVHNode {
 private:
+    Circle bounding_disc_;
     std::shared_ptr<Triangle> leaf_triangle_;
 
     std::unique_ptr<BVHNode> left_child_;
     std::unique_ptr<BVHNode> right_child_;
 
 public:
-    explicit BVHNode(std::vector<std::shared_ptr<Triangle>> triangles);
+    explicit BVHNode(const std::vector<std::shared_ptr<Triangle>>& triangles);
 };
 
 RIGID2D_NAMESPACE_END
