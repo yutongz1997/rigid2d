@@ -28,6 +28,7 @@ endif()
 set(PROJECT_HEADER_DIR "${CMAKE_SOURCE_DIR}/include")
 set(PROJECT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
 set(SOURCE_FILES
+        "src/body.cpp"
         "src/bvh.cpp"
         "src/geometry.cpp"
         "src/scene.cpp"

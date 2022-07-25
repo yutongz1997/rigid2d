@@ -18,6 +18,58 @@
 
 RIGID2D_NAMESPACE_BEGIN
 
+class RigidTransformation {
+private:
+    // Translational component of the rigid transformation
+    Eigen::Vector2f translation_;
+    // Rotational component (in radians) of the rigid transformation
+    float rotation_;
+
+    // Internally used transformation matrix
+    Eigen::Matrix3f transformation_;
+
+public:
+    RigidTransformation() {
+        translation_.setZero();
+        rotation_ = 0.0f;
+        transformation_.setIdentity();
+    }
+
+    inline void Set(const Eigen::Vector2f& translation,
+                    float rotation) {
+        translation_ = translation;
+        rotation_ = rotation;
+
+        float c = std::cos(rotation_);
+        float s = std::sin(rotation_);
+        transformation_ << c, -s, translation_.x(),
+                           s,  c, translation_.y(),
+                           0,  0,                1;
+    }
+
+    inline void SetInverse(const Eigen::Vector2f& translation,
+                           float rotation) {
+        Set(-translation, -rotation);
+    }
+
+    inline Eigen::Vector2f TransformPoint(const Eigen::Vector2f& p) {
+        Eigen::Vector3f p_homogeneous { p.x(), p.y(), 1 };
+        Eigen::Vector3f q = transformation_ * p_homogeneous;
+        return { p.x(), p.y() };
+    }
+
+    inline Eigen::Vector2f TransformVector(const Eigen::Vector2f& v) {
+        Eigen::Vector3f v_homogeneous { v.x(), v.y(), 0 };
+        Eigen::Vector3f w = transformation_ * v_homogeneous;
+        return { w.x(), w.y() };
+    }
+
+    [[nodiscard]] inline Eigen::Matrix3f TransformationMatrix() const {
+        return transformation_;
+    }
+};
+
+
 struct Vertex {
     // X-coordinate of the vertex
     float x;
@@ -54,13 +106,35 @@ struct Vertex {
 };
 
 
+struct Triangle {
+    std::shared_ptr<Vertex> v1;
+    std::shared_ptr<Vertex> v2;
+    std::shared_ptr<Vertex> v3;
+    Eigen::Vector2f centroid;
+    float area;
+
+    explicit Triangle(const std::shared_ptr<Vertex>& v1,
+                      const std::shared_ptr<Vertex>& v2,
+                      const std::shared_ptr<Vertex>& v3)
+            : v1(v1), v2(v2), v3(v3) {
+        // Compute the centroid of this triangle
+        centroid.x() = (v1->x + v2->x + v3->x) / 3.0f;
+        centroid.y() = (v1->y + v2->y + v3->y) / 3.0f;
+        // Compute the area of this triangle
+        Eigen::Vector2f e1 { v2->x - v1->x, v2->y - v1->y };
+        Eigen::Vector2f e2 { v3->x - v1->x, v3->y - v1->y };
+        area = 0.5f * std::abs(Cross2(e1, e2));
+    }
+};
+
+
 struct Circle {
     // Center position (in world coordinates) of the circle
     Eigen::Vector2f center;
     // Radius of the circle
     float radius;
 
-    Circle() : center({0, 0}), radius(1.0f) { }
+    Circle() : center({ 0.0f, 0.0f }), radius(1.0f) { }
 
     Circle(const Eigen::Vector2f& center, float radius)
         : center(center), radius(radius) { }
@@ -77,28 +151,6 @@ struct Circle {
 };
 
 
-struct Triangle {
-    std::shared_ptr<Vertex> v1;
-    std::shared_ptr<Vertex> v2;
-    std::shared_ptr<Vertex> v3;
-    Eigen::Vector2f centroid;
-    float area;
-
-    explicit Triangle(const std::shared_ptr<Vertex>& v1,
-                      const std::shared_ptr<Vertex>& v2,
-                      const std::shared_ptr<Vertex>& v3)
-                      : v1(v1), v2(v2), v3(v3) {
-        // Compute the centroid of this triangle
-        centroid.x() = (v1->x + v2->x + v3->x) / 3.0f;
-        centroid.y() = (v1->y + v2->y + v3->y) / 3.0f;
-        // Compute the area of this triangle
-        Eigen::Vector2f e1 { v2->x - v1->x, v2->y - v1->y };
-        Eigen::Vector2f e2 { v3->x - v1->x, v3->y - v1->y };
-        area = 0.5f * std::fabs(Cross2(e1, e2));
-    }
-};
-
-
 class TriangleMesh {
 private:
     std::string name_;
@@ -110,8 +162,10 @@ private:
     std::vector<float> areas_;
     float area_;
 
-    std::vector<GLfloat> buffer_vertices_;
-    std::vector<GLuint> buffer_indices_;
+    std::vector<GLfloat> vertex_buffer_;
+    std::vector<GLuint> index_buffer_;
+
+    friend class RigidBody;
 
 private:
     void MakeVertices();
@@ -140,11 +194,11 @@ public:
     }
 
     [[nodiscard]] inline std::vector<GLfloat> VertexBufferData() const {
-        return buffer_vertices_;
+        return vertex_buffer_;
     }
 
     [[nodiscard]] inline std::vector<GLuint> IndexBufferData() const {
-        return buffer_indices_;
+        return index_buffer_;
     }
 
     friend std::ostream& operator<<(std::ostream& os,

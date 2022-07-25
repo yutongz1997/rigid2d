@@ -63,6 +63,8 @@ Simulator::Simulator(int width, int height, const std::string& scene_path) {
     InitWindow(width, height);
 
     scene_ = std::make_unique<Scene>(scene_path);
+    glfwSetWindowTitle(window_,
+                       fmt::format("Simulation (Scene: {})", scene_->Name()).c_str());
 }
 
 
@@ -73,7 +75,12 @@ Simulator::~Simulator() {
 
 
 void Simulator::Run() {
-    if (!window_) {
+    if (!window_ || !scene_) {
+        return;
+    }
+    // Only to display the "render is failed" message
+    if (!scene_->IsValid()) {
+        scene_->Render();
         return;
     }
 
@@ -85,6 +92,9 @@ void Simulator::Run() {
         glEnable(GL_DEPTH_TEST);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+        scene_->body_system_.Step(0.01);
         scene_->Render();
 
         glfwSwapBuffers(window_);

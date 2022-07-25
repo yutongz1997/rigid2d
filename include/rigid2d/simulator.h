@@ -20,6 +20,8 @@ private:
 
     std::unique_ptr<Scene> scene_;
 
+    std::shared_ptr<Shader> circle_shader_;
+
 private:
     bool InitWindow(int width, int height);
     void DestroyWindow();

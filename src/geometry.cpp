@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cmath>
 #include <fstream>
 #include <vector>
 #include <memory>
@@ -98,11 +99,11 @@ Circle Circle::WelzlCircle(const std::vector<std::shared_ptr<Vertex>> &vertices)
 
 
 void TriangleMesh::MakeVertices() {
-    std::size_t num_vertices = buffer_vertices_.size() / 2;
+    std::size_t num_vertices = vertex_buffer_.size() / 2;
     vertices_ = std::vector<std::shared_ptr<Vertex>>(num_vertices);
     for (int i = 0; i < num_vertices; ++i) {
-        float x = buffer_vertices_[2 * i];
-        float y = buffer_vertices_[2 * i + 1];
+        float x = vertex_buffer_[2 * i];
+        float y = vertex_buffer_[2 * i + 1];
         vertices_[i] = std::make_shared<Vertex>(x, y);
         vertices_[i]->index = i;
     }
@@ -110,10 +111,10 @@ void TriangleMesh::MakeVertices() {
 
 
 void TriangleMesh::MakeTriangles() {
-    for (int i = 0; i < buffer_indices_.size(); i += 3) {
-        std::shared_ptr<Vertex> v1 = vertices_[buffer_indices_[i]];
-        std::shared_ptr<Vertex> v2 = vertices_[buffer_indices_[i + 1]];
-        std::shared_ptr<Vertex> v3 = vertices_[buffer_indices_[i + 2]];
+    for (int i = 0; i < index_buffer_.size(); i += 3) {
+        auto& v1 = vertices_[index_buffer_[i]];
+        auto& v2 = vertices_[index_buffer_[i + 1]];
+        auto& v3 = vertices_[index_buffer_[i + 2]];
         triangles_.push_back(std::make_shared<Triangle>(v1, v2, v3));
     }
 }
@@ -129,8 +130,8 @@ void TriangleMesh::CleanUp() {
     areas_.clear();
     area_ = 0.0f;
 
-    buffer_vertices_.clear();
-    buffer_indices_.clear();
+    vertex_buffer_.clear();
+    index_buffer_.clear();
 }
 
 
@@ -177,8 +178,8 @@ TriangleMesh::TriangleMesh(const std::string& name, const std::string& path) {
                 break;
             }
             // Record the new vertex coordinates
-            buffer_vertices_.push_back(x);
-            buffer_vertices_.push_back(y);
+            vertex_buffer_.push_back(x);
+            vertex_buffer_.push_back(y);
         }
 
             // The current line contains a face
@@ -196,9 +197,9 @@ TriangleMesh::TriangleMesh(const std::string& name, const std::string& path) {
                 break;
             }
             // Record the new triangle vertex indices (also need to convert to 0-indexed)
-            buffer_indices_.push_back(idx_v1 - 1);
-            buffer_indices_.push_back(idx_v2 - 1);
-            buffer_indices_.push_back(idx_v3 - 1);
+            index_buffer_.push_back(idx_v1 - 1);
+            index_buffer_.push_back(idx_v2 - 1);
+            index_buffer_.push_back(idx_v3 - 1);
         }
 
         ++line_count;
@@ -209,17 +210,37 @@ TriangleMesh::TriangleMesh(const std::string& name, const std::string& path) {
     if (loaded_) {
         file.close();
 
-        // Fill in arrays of vertices, triangles, triangle centroids and areas
+        // Make vertices and triangles using the data from vertex and index buffers
         MakeVertices();
         MakeTriangles();
-        centroids_ = std::vector<Eigen::Vector2f>(triangles_.size());
-        std::transform(triangles_.begin(), triangles_.end(), centroids_.begin(),
-                       [](const std::shared_ptr<Triangle> &trig) { return trig->centroid; });
+        // Populate the array of triangle areas and compute their total areas
         areas_ = std::vector<float>(triangles_.size());
         std::transform(triangles_.begin(), triangles_.end(), areas_.begin(),
-                       [](const std::shared_ptr<Triangle> &trig) { return trig->area; });
-        // Compute the total area of the triangle mesh
+                       [](const std::shared_ptr<Triangle>& trig) { return trig->area; });
         area_ = std::accumulate(areas_.begin(), areas_.end(), 0.0f);
+
+        // Compute the centroid of the triangle mesh
+        Eigen::Vector2f centroid;
+        centroid.setZero();
+        for (const auto& trig : triangles_) {
+            centroid += trig->area * trig->centroid;
+        }
+        centroid /= area_;
+
+        // Adjust all vertex positions (including vertices in the vertex buffer) so that
+        // the centroid of the triangle mesh is at origin
+        for (int i = 0; i < vertex_buffer_.size(); i += 2) {
+            vertex_buffer_[i] -= centroid.x();
+            vertex_buffer_[i + 1] -= centroid.y();
+        }
+        for (const auto& vert : vertices_) {
+            vert->x -= centroid.x();
+            vert->y -= centroid.y();
+        }
+        centroids_ = std::vector<Eigen::Vector2f>(triangles_.size());
+        for (int i = 0; i < triangles_.size(); ++i) {
+            centroids_[i] = triangles_[i]->centroid - centroid;
+        }
     }
 }
 

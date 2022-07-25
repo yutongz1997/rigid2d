@@ -11,6 +11,14 @@
 
 RIGID2D_NAMESPACE_BEGIN
 
+
+Eigen::Vector2f JsonArray2ToVector2f(const scene_json& json_arr) {
+    auto arr = json_arr.get<std::vector<float>>();
+    assert(arr.size() >= 2);
+    return { arr[0], arr[1] };
+}
+
+
 void Scene::LoadMeshes() {
     std::vector<scene_json> json_meshes;
     descriptor_.at("meshes").get_to(json_meshes);
@@ -31,17 +39,17 @@ void Scene::LoadMeshes() {
         glGenBuffers(1, &vbo);
         glGenBuffers(1, &ibo);
         // Populate vertices and indices data into the VBO and IBO
-        const auto& buffer_vertices = meshes_[name]->VertexBufferData();
+        const auto& vertex_buffer = meshes_[name]->VertexBufferData();
         glBindVertexArray(vao);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(buffer_vertices.size() * sizeof(GLfloat)),
-                     &buffer_vertices[0], GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertex_buffer.size() * sizeof(GLfloat)),
+                     &vertex_buffer[0], GL_STATIC_DRAW);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), nullptr);
         glEnableVertexAttribArray(0);
-        const auto& buffer_indices = meshes_[name]->IndexBufferData();
+        const auto& index_buffer = meshes_[name]->IndexBufferData();
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(buffer_indices.size() * sizeof(GLuint)),
-                     &buffer_indices[0], GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(index_buffer.size() * sizeof(GLuint)),
+                     &index_buffer[0], GL_STATIC_DRAW);
         glBindVertexArray(0);
         // Store the generated VAO for future rendering
         vaos_[name] = vao;
@@ -62,6 +70,40 @@ void Scene::LoadShaders() {
         auto fragment_shader = obj_shader["fragment_path"].get<std::string>();
         shaders_[name] = std::make_shared<Shader>(vertex_shader, fragment_shader, 'f');
     }
+
+
+    std::string circ_vert = "#version 410 core\n"
+                            "layout (location = 0) in vec2 v_position;\n"
+                            "uniform mat3 model;\n"
+                            "void main() {\n"
+                            "   gl_Position = vec4(model * vec3(v_position, 0.0f), 1.0f);\n"
+                            "}";
+    std::string circ_frag = "#version 410 core\n"
+                            "out vec4 frag_color;\n"
+                            "void main() {\n"
+                            "    frag_color = vec4(1.0f, 0.0f, 0.0f, 1.0f);\n"
+                            "}";
+    circ_shader_ = std::make_shared<Shader>(circ_vert, circ_frag, 's');
+}
+
+
+void Scene::LoadBodies() {
+    std::vector<scene_json> json_bodies;
+    descriptor_.at("bodies").get_to(json_bodies);
+
+    for (auto& json_body : json_bodies) {
+        std::map<std::string, scene_json> obj_body;
+        json_body.get_to(obj_body);
+
+        auto position = JsonArray2ToVector2f(json_body.at("position"));
+        auto orientation = json_body.at("orientation").get<float>();
+        auto mass = json_body.at("mass").get<float>();
+        auto mesh_name = json_body.at("mesh").get<std::string>();
+        auto shader_name = json_body.at("shader").get<std::string>();
+
+        body_system_.AddBody(meshes_[mesh_name], shaders_[shader_name],
+                             position, orientation, mass);
+    }
 }
 
 
@@ -74,14 +116,13 @@ bool Scene::Load(const std::string &path) {
     try {
         // Read the name of the scene
         name_ = descriptor_.at("name").get<std::string>();
-
         LoadMeshes();
         LoadShaders();
-
+        LoadBodies();
         return true;
     } catch (const std::exception& e) {
         fmt::print(stderr,
-                   "[Scene] Error: Failed to parse the scene description file {}. "
+                   "[Scene] Error: Failed to parse the scene description file '{}'. "
                    "Reason: {}.\n",
                    path, e.what());
         return false;
@@ -101,10 +142,18 @@ void Scene::Render() {
         return;
     }
 
-    for (const auto& [name, mesh] : meshes_) {
-        shaders_[name]->Use();
-        glBindVertexArray(vaos_[name]);
-        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(mesh->NumVertices() * 2),
+    for (const auto& body : body_system_.bodies_) {
+        body->shader_->Use();
+        body->shader_->SetMatrix3f("model", body->body_to_world.TransformationMatrix());
+        glBindVertexArray(vaos_[body->geometry_->Name()]);
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(body->geometry_->IndexBufferData().size()),
+                       GL_UNSIGNED_INT, nullptr);
+        glBindVertexArray(0);
+
+        circ_shader_->Use();
+        circ_shader_->SetMatrix3f("model", body->body_to_world.TransformationMatrix());
+        glBindVertexArray(body->bvh_vao_);
+        glDrawElements(GL_LINES, static_cast<GLsizei>(body->bvh_index_buffer_.size()),
                        GL_UNSIGNED_INT, nullptr);
         glBindVertexArray(0);
     }

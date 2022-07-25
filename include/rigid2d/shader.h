@@ -27,6 +27,12 @@ public:
     inline void Use() const {
         glUseProgram(id_);
     }
+
+    inline void SetMatrix3f(const std::string& name,
+                            const Eigen::Matrix3f& mat) const {
+        GLint location = glGetUniformLocation(id_, name.c_str());
+        glUniformMatrix3fv(location, 1, GL_FALSE, mat.data());
+    }
 };
 
 RIGID2D_NAMESPACE_END

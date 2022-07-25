@@ -17,6 +17,7 @@
 #include "rigid2d/common.h"
 #include "rigid2d/shader.h"
 #include "rigid2d/geometry.h"
+#include "rigid2d/bodysystem.h"
 
 
 RIGID2D_NAMESPACE_BEGIN
@@ -48,18 +49,34 @@ private:
     std::unordered_map<std::string, GLuint> vaos_;
     // Storage of shaders used to render each rigid body
     std::unordered_map<std::string, std::shared_ptr<Shader>> shaders_;
+    //
+    std::shared_ptr<Shader> circ_shader_;
+    // System of rigid bodies in the scene
+    RigidBodySystem body_system_;
+
+    friend class Simulator;
 
 private:
     // Load all triangle meshes. Should only be called by Load()
     void LoadMeshes();
     // Load all vertex and fragment shaders. Should only be called by Load()
     void LoadShaders();
+    // Load all rigid bodies. Should only be called by Load()
+    void LoadBodies();
 
     // Load the given scene description file
     bool Load(const std::string& path);
 
 public:
     explicit Scene(const std::string& path);
+
+    [[nodiscard]] inline std::string Name() const {
+        return name_;
+    }
+
+    [[nodiscard]] inline bool IsValid() const {
+        return valid_;
+    }
 
     void Render();
 };
