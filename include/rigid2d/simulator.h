@@ -3,6 +3,8 @@
 
 #include <memory>
 
+#include <Eigen/Core>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -16,11 +18,13 @@ RIGID2D_NAMESPACE_BEGIN
 
 class Simulator {
 private:
+    int width_;
+    int height_;
     GLFWwindow* window_;
 
     std::unique_ptr<Scene> scene_;
-
-    std::shared_ptr<Shader> circle_shader_;
+    Eigen::Matrix4f ortho_;
+    bool running_;
 
 private:
     bool InitWindow(int width, int height);

@@ -13,7 +13,7 @@
 
 RIGID2D_NAMESPACE_BEGIN
 
-class RigidBody {
+class RigidBody : std::enable_shared_from_this<RigidBody> {
 private:
     // Underlying geometry (triangle mesh) of the body
     std::shared_ptr<TriangleMesh> geometry_;
@@ -22,11 +22,6 @@ private:
 
     //
     std::shared_ptr<BVHNode> bvh_root_;
-    //
-    std::vector<GLfloat> bvh_vertex_buffer_;
-    std::vector<GLuint> bvh_index_buffer_;
-    //
-    GLuint bvh_vao_;
 
     // Mass of the body
     float mass_;
@@ -55,18 +50,22 @@ private:
     // Total torque applied to the body
     float torque_;
 
-    // Rigid transformation to bring vertices/vectors in body coordinates to
+    // Rigid transformation to bring vertices/vectors in local coordinates to
     // world coordinates
-    RigidTransformation body_to_world;
+    RigidTransformation local_to_world_;
     // Rigid transformation to bring vertices/vectors in world coordinates to
-    // body coordinates (inverse of the above transformation)
-    RigidTransformation world_to_body;
+    // local coordinates (inverse of the above transformation)
+    RigidTransformation world_to_local_;
 
+    //
+    int index_;
+
+    friend class BoundingDisc;
+    friend class MouseSpringForce;
+    friend class RigidBodySystem;
     friend class Scene;
 
 private:
-    void PopulateBVHBuffer(int n = 360);
-
     void ComputeRotationalInertia();
 
     void UpdateTransformation();
@@ -80,13 +79,38 @@ public:
 
     ~RigidBody() = default;
 
-    void Reset();
-
-    inline void AddForce(const Eigen::Vector2f& force) {
-        force_ += force;
+    [[nodiscard]] inline float Mass() const {
+        return mass_;
     }
 
-    void Step(float duration);
+    [[nodiscard]] inline Eigen::Vector2f PointToWorld(const Eigen::Vector2f& p_local) const {
+        return local_to_world_.TransformPoint(p_local);
+    }
+
+    [[nodiscard]] inline Eigen::Vector2f VectorToWorld(const Eigen::Vector2f& v_local) const {
+        return local_to_world_.TransformVector(v_local);
+    }
+
+    [[nodiscard]] inline Eigen::Vector2f PointToLocal(const Eigen::Vector2f& p_world) const {
+        return world_to_local_.TransformPoint(p_world);
+    }
+
+    [[nodiscard]] inline Eigen::Vector2f VectorToLocal(const Eigen::Vector2f& v_world) const {
+        return world_to_local_.TransformVector(v_world);
+    }
+
+    void AddForce(const Eigen::Vector2f& force);
+
+    void AddContactForce(const Eigen::Vector2f& contact_point,
+                         const Eigen::Vector2f& contact_force);
+
+    [[nodiscard]] Eigen::Vector2f SpatialVelocity(const Eigen::Vector2f& contact_point) const;
+
+    [[nodiscard]] bool IsInside(const Eigen::Vector2f& p_world) const;
+
+    void ResetState();
+
+    void Step(float dt);
 };
 
 RIGID2D_NAMESPACE_END

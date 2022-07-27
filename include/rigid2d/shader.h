@@ -28,10 +28,16 @@ public:
         glUseProgram(id_);
     }
 
-    inline void SetMatrix3f(const std::string& name,
-                            const Eigen::Matrix3f& mat) const {
+    inline void SetVector3f(const std::string& name,
+                            const Eigen::Vector3f& vec) const {
         GLint location = glGetUniformLocation(id_, name.c_str());
-        glUniformMatrix3fv(location, 1, GL_FALSE, mat.data());
+        glUniform3f(location, vec.x(), vec.y(), vec.z());
+    }
+
+    inline void SetMatrix4f(const std::string& name,
+                            const Eigen::Matrix4f& mat) const {
+        GLint location = glGetUniformLocation(id_, name.c_str());
+        glUniformMatrix4fv(location, 1, GL_FALSE, mat.data());
     }
 };
 

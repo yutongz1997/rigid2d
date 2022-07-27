@@ -74,9 +74,10 @@ void Scene::LoadShaders() {
 
     std::string circ_vert = "#version 410 core\n"
                             "layout (location = 0) in vec2 v_position;\n"
-                            "uniform mat3 model;\n"
+                            "uniform mat4 model;\n"
+                            "uniform mat4 projection;\n"
                             "void main() {\n"
-                            "   gl_Position = vec4(model * vec3(v_position, 0.0f), 1.0f);\n"
+                            "   gl_Position = projection * model * vec4(v_position, 0.0f, 1.0f);\n"
                             "}";
     std::string circ_frag = "#version 410 core\n"
                             "out vec4 frag_color;\n"
@@ -97,7 +98,12 @@ void Scene::LoadBodies() {
 
         auto position = JsonArray2ToVector2f(json_body.at("position"));
         auto orientation = json_body.at("orientation").get<float>();
-        auto mass = json_body.at("mass").get<float>();
+        float mass;
+        if (json_body.contains("pinned") && json_body["pinned"].get<bool>()) {
+            mass = kInf;
+        } else {
+            mass = json_body.at("mass").get<float>();
+        }
         auto mesh_name = json_body.at("mesh").get<std::string>();
         auto shader_name = json_body.at("shader").get<std::string>();
 
@@ -135,27 +141,26 @@ Scene::Scene(const std::string &path) {
 }
 
 
-void Scene::Render() {
+void Scene::Render(const Eigen::Matrix4f& ortho) {
     if (!valid_) {
         fmt::print(stderr,
                    "[Scene] Error: Failed to render as the scene is invalid.\n");
         return;
     }
 
-    for (const auto& body : body_system_.bodies_) {
+    for (int i = 0; i < body_system_.bodies_.size(); ++i) {
+        auto& body = body_system_.bodies_[i];
         body->shader_->Use();
-        body->shader_->SetMatrix3f("model", body->body_to_world.TransformationMatrix());
+        body->shader_->SetMatrix4f("model", body->local_to_world_.TransformationMatrix());
+        body->shader_->SetMatrix4f("projection", ortho);
+        body->shader_->SetVector3f("color", body_system_.colors_[i]);
         glBindVertexArray(vaos_[body->geometry_->Name()]);
         glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(body->geometry_->IndexBufferData().size()),
                        GL_UNSIGNED_INT, nullptr);
         glBindVertexArray(0);
 
-        circ_shader_->Use();
-        circ_shader_->SetMatrix3f("model", body->body_to_world.TransformationMatrix());
-        glBindVertexArray(body->bvh_vao_);
-        glDrawElements(GL_LINES, static_cast<GLsizei>(body->bvh_index_buffer_.size()),
-                       GL_UNSIGNED_INT, nullptr);
-        glBindVertexArray(0);
+        body->bvh_root_->Render(circ_shader_, ortho);
+        // body->bvh_root_->RenderVisitBoundary(circ_shader_, ortho, body_system_.visit_id_);
     }
 }
 

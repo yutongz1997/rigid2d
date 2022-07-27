@@ -18,6 +18,9 @@
 
 RIGID2D_NAMESPACE_BEGIN
 
+class RigidBody;
+
+
 class RigidTransformation {
 private:
     // Translational component of the rigid transformation
@@ -26,7 +29,7 @@ private:
     float rotation_;
 
     // Internally used transformation matrix
-    Eigen::Matrix3f transformation_;
+    Eigen::Matrix4f transformation_;
 
 public:
     RigidTransformation() {
@@ -42,9 +45,10 @@ public:
 
         float c = std::cos(rotation_);
         float s = std::sin(rotation_);
-        transformation_ << c, -s, translation_.x(),
-                           s,  c, translation_.y(),
-                           0,  0,                1;
+        transformation_ <<    c,   -s, 0.0f, translation_.x(),
+                              s,    c, 0.0f, translation_.y(),
+                           0.0f, 0.0f, 1.0f,             0.0f,
+                           0.0f, 0.0f, 0.0f,             1.0f;
     }
 
     inline void SetInverse(const Eigen::Vector2f& translation,
@@ -52,19 +56,19 @@ public:
         Set(-translation, -rotation);
     }
 
-    inline Eigen::Vector2f TransformPoint(const Eigen::Vector2f& p) {
-        Eigen::Vector3f p_homogeneous { p.x(), p.y(), 1 };
-        Eigen::Vector3f q = transformation_ * p_homogeneous;
-        return { p.x(), p.y() };
+    [[nodiscard]] inline Eigen::Vector2f TransformPoint(const Eigen::Vector2f& p) const {
+        Eigen::Vector4f p_homogeneous { p.x(), p.y(), 0.0f, 1.0f };
+        Eigen::Vector4f q = transformation_ * p_homogeneous;
+        return { q.x(), q.y() };
     }
 
-    inline Eigen::Vector2f TransformVector(const Eigen::Vector2f& v) {
-        Eigen::Vector3f v_homogeneous { v.x(), v.y(), 0 };
-        Eigen::Vector3f w = transformation_ * v_homogeneous;
+    [[nodiscard]] inline Eigen::Vector2f TransformVector(const Eigen::Vector2f& v) const {
+        Eigen::Vector4f v_homogeneous { v.x(), v.y(), 0.0f, 0.0f };
+        Eigen::Vector4f w = transformation_ * v_homogeneous;
         return { w.x(), w.y() };
     }
 
-    [[nodiscard]] inline Eigen::Matrix3f TransformationMatrix() const {
+    [[nodiscard]] inline Eigen::Matrix4f TransformationMatrix() const {
         return transformation_;
     }
 };
@@ -125,11 +129,13 @@ struct Triangle {
         Eigen::Vector2f e2 { v3->x - v1->x, v3->y - v1->y };
         area = 0.5f * std::abs(Cross2(e1, e2));
     }
+
+    [[nodiscard]] bool IsInside(const Eigen::Vector2f& p) const;
 };
 
 
 struct Circle {
-    // Center position (in world coordinates) of the circle
+    // Position of the center of the circle
     Eigen::Vector2f center;
     // Radius of the circle
     float radius;
@@ -139,12 +145,8 @@ struct Circle {
     Circle(const Eigen::Vector2f& center, float radius)
         : center(center), radius(radius) { }
 
-    [[nodiscard]] inline bool IsInCircle(const Vertex& p) const {
-        return p.distanceSquared(center) <= radius * radius;
-    }
-
-    [[nodiscard]] inline bool IsInCircle(const Eigen::Vector2f& p) const {
-        return (p - center).squaredNorm() <= radius * radius;
+    [[nodiscard]] inline bool IsInside(const Vertex& v) const {
+        return v.distanceSquared(center) <= radius * radius;
     }
 
     static Circle WelzlCircle(const std::vector<std::shared_ptr<Vertex>>& vertices);

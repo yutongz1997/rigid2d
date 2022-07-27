@@ -7,34 +7,6 @@
 
 RIGID2D_NAMESPACE_BEGIN
 
-void RigidBody::PopulateBVHBuffer(int n) {
-    std::queue<std::shared_ptr<BVHNode>> queue;
-    queue.push(bvh_root_);
-    while (!queue.empty()) {
-        auto node = queue.front();
-        queue.pop();
-
-        Eigen::Vector2f center = node->bounding_disc_.center;
-        float radius = node->bounding_disc_.radius;
-        GLuint idx_start = bvh_vertex_buffer_.size() / 2;
-        for (int i = 0; i < n; ++i) {
-            auto angle = static_cast<float>(2 * M_PI * i / n);
-            bvh_vertex_buffer_.push_back(center.x() + radius * std::cos(angle));
-            bvh_vertex_buffer_.push_back(center.y() + radius * std::sin(angle));
-            bvh_index_buffer_.push_back(idx_start + i % n);
-            bvh_index_buffer_.push_back(idx_start + (i + 1) % n);
-        }
-
-        if (node->left_child_) {
-            queue.push(node->left_child_);
-        }
-        if (node->right_child_) {
-            queue.push(node->right_child_);
-        }
-    }
-}
-
-
 /**
  * See https://physics.stackexchange.com/questions/708936/how-to-calculate-the-moment-of-inertia-of-convex-polygon-two-dimensions
  */
@@ -55,39 +27,20 @@ void RigidBody::ComputeRotationalInertia() {
 
 
 void RigidBody::UpdateTransformation() {
-    body_to_world.Set(position_, orientation_);
-    world_to_body.SetInverse(position_, orientation_);
+    local_to_world_.Set(position_, orientation_);
+    world_to_local_.SetInverse(position_, orientation_);
 }
 
 
-RigidBody::RigidBody(const std::shared_ptr<TriangleMesh> &geometry,
-                     const std::shared_ptr<Shader> &shader,
-                     const Eigen::Vector2f &position,
+RigidBody::RigidBody(const std::shared_ptr<TriangleMesh>& geometry,
+                     const std::shared_ptr<Shader>& shader,
+                     const Eigen::Vector2f& position,
                      float orientation,
                      float mass) {
     geometry_ = geometry;
     shader_ = shader;
 
-    bvh_root_ = std::make_shared<BVHNode>(geometry_->triangles_);
-    PopulateBVHBuffer();
-
-    bvh_vao_ = 0;
-    glGenVertexArrays(1, &bvh_vao_);
-    GLuint bvh_vbo, bvh_ibo;
-    glGenBuffers(1, &bvh_vbo);
-    glGenBuffers(1, &bvh_ibo);
-    // Populate vertices and indices data into the VBO and IBO
-    const auto& vertex_buffer = bvh_vertex_buffer_;
-    glBindVertexArray(bvh_vao_);
-    glBindBuffer(GL_ARRAY_BUFFER, bvh_vbo);
-    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(bvh_vertex_buffer_.size() * sizeof(GLfloat)),
-                 &bvh_vertex_buffer_[0], GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), nullptr);
-    glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bvh_ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(bvh_index_buffer_.size() * sizeof(GLuint)),
-                 &bvh_index_buffer_[0], GL_STATIC_DRAW);
-    glBindVertexArray(0);
+    bvh_root_ = std::make_shared<BVHNode>(geometry_->triangles_, this);
 
     mass_ = mass;
     inverse_mass_ = (mass == kInf || mass == -kInf) ? 0.0f : 1.0f / mass;
@@ -105,10 +58,44 @@ RigidBody::RigidBody(const std::shared_ptr<TriangleMesh> &geometry,
     angular_velocity_ = 0.0f;
     force_.setZero();
     torque_ = 0.0f;
+
+    index_ = -1;
 }
 
 
-void RigidBody::Reset() {
+void RigidBody::AddForce(const Eigen::Vector2f& force) {
+    force_ += force;
+}
+
+
+void RigidBody::AddContactForce(const Eigen::Vector2f& contact_point,
+                                const Eigen::Vector2f& contact_force) {
+    force_ += contact_force;
+    torque_ += Cross2(contact_point - position_, contact_force);
+}
+
+
+Eigen::Vector2f RigidBody::SpatialVelocity(const Eigen::Vector2f& contact_point) const {
+    Eigen::Vector2f tmp = angular_velocity_ * (contact_point - position_);
+    Eigen::Vector2f vel { -tmp.y(), tmp.x() };
+    return vel + linear_velocity_;
+}
+
+
+bool RigidBody::IsInside(const Eigen::Vector2f& p_world) const {
+    Eigen::Vector2f p_local = world_to_local_.TransformPoint(p_world);
+    if (bvh_root_->volume_->IsInside(p_local)) {
+        for (const auto& trig : geometry_->triangles_) {
+            if (trig->IsInside(p_local)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+
+void RigidBody::ResetState() {
     position_ = initial_position_;
     orientation_ = initial_orientation_;
     linear_velocity_.setZero();
@@ -119,14 +106,14 @@ void RigidBody::Reset() {
 }
 
 
-void RigidBody::Step(float duration) {
+void RigidBody::Step(float dt) {
     if (inverse_mass_ > 0.0f) {
         // Advance the state of angular velocity and orientation angle
-        angular_velocity_ += inverse_rotational_inertia_ * torque_ * duration;
-        orientation_ += angular_velocity_ * duration;
+        angular_velocity_ += inverse_rotational_inertia_ * torque_ * dt;
+        orientation_ += angular_velocity_ * dt;
         // Advance the state of linear velocity and position
-        linear_velocity_ += inverse_mass_ * force_ * duration;
-        position_ += linear_velocity_ * duration;
+        linear_velocity_ += inverse_mass_ * force_ * dt;
+        position_ += linear_velocity_ * dt;
         // Update rigid transformation matrices after stepping
         UpdateTransformation();
     }

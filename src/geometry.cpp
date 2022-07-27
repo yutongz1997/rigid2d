@@ -17,6 +17,26 @@
 
 RIGID2D_NAMESPACE_BEGIN
 
+bool Triangle::IsInside(const Eigen::Vector2f &p) const {
+    // See https://observablehq.com/@kelleyvanevert/2d-point-in-triangle-test
+    Eigen::Vector2f e1 { v2->x - v1->x, v2->y - v1->y };
+    Eigen::Vector2f e2 { v3->x - v1->x, v3->y - v1->y };
+    Eigen::Vector2f ep  { p.x() - v1->x, p.y() - v1->y };
+
+    float e1_e1 = e1.dot(e1);
+    float e2_e2 = e2.dot(e2);
+    float e1_e2 = e1.dot(e2);
+    float e1_ep = e1.dot(ep);
+    float e2_ep = e2.dot(ep);
+
+    float denom = e2_e2 * e1_e1 - e1_e2 * e1_e2;
+    float alpha = (e1_e1 * e2_ep - e1_e2 * e1_ep) / denom;
+    float beta = (e2_e2 * e1_ep - e1_e2 * e2_ep) / denom;
+
+    return alpha >= 0.0f && beta >= 0.0f && alpha + beta < 1.0f;
+}
+
+
 Circle TwoVerticesCircle(const std::shared_ptr<Vertex>& v1,
                          const std::shared_ptr<Vertex>& v2) {
     Eigen::Vector2f center { 0.5f * (v1->x + v2->x),
@@ -76,7 +96,7 @@ Circle MinimumEnclosingCircle(const std::vector<std::shared_ptr<Vertex>>& inputs
         // Pick the last vertex of the input set, and if that vertex lies inside the
         // circle, it is indeed the minimum
         std::size_t idx = num_inputs - 1;
-        if (mec.IsInCircle(*inputs[idx])) {
+        if (mec.IsInside(*inputs[idx])) {
             return mec;
         }
         // Otherwise, update the set of support to additionally contain the new vertex

@@ -6,6 +6,7 @@
 #include <map>
 #include <unordered_map>
 #include <memory>
+#include <random>
 #include <utility>
 
 #include <fmt/core.h>
@@ -78,7 +79,7 @@ public:
         return valid_;
     }
 
-    void Render();
+    void Render(const Eigen::Matrix4f& ortho);
 };
 
 RIGID2D_NAMESPACE_END

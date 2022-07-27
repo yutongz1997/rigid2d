@@ -11,6 +11,7 @@
       "name": "glad",
       "features": ["gl-api-41"]
     },
-    "glfw3"
+    "glfw3",
+    "glm"
   ]
 }
