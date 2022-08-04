@@ -159,8 +159,8 @@ void Scene::Render(const Eigen::Matrix4f& ortho) {
                        GL_UNSIGNED_INT, nullptr);
         glBindVertexArray(0);
 
-        body->bvh_root_->Render(circ_shader_, ortho);
-        // body->bvh_root_->RenderVisitBoundary(circ_shader_, ortho, body_system_.visit_id_);
+        // body->bvh_root_->Render(circ_shader_, ortho);
+        body->bvh_root_->RenderVisitBoundary(circ_shader_, ortho, body_system_.visit_id_);
     }
 }
 

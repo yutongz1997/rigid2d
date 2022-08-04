@@ -19,9 +19,9 @@ void RigidBodySystem::CheckCollision(const std::shared_ptr<RigidBody> &body1,
         if (node1->IsLeaf() && node2->IsLeaf()) {
             ProcessCollision(body1, node1->leaf_triangle_, body2, node2->leaf_triangle_);
         } else {
-            if (node1->volume_->Radius() > node2->volume_->Radius()) {
+            if (node2->IsLeaf() || (!node1->IsLeaf() && node1->volume_->Radius() >= node2->volume_->Radius())) {
                 CheckCollision(body1, node1->left_child_, body2, node2);
-                CheckCollision(body2, node1->right_child_, body2, node2);
+                CheckCollision(body1, node1->right_child_, body2, node2);
             } else {
                 CheckCollision(body1, node1, body2, node2->left_child_);
                 CheckCollision(body1, node1, body2, node2->right_child_);
@@ -32,39 +32,13 @@ void RigidBodySystem::CheckCollision(const std::shared_ptr<RigidBody> &body1,
 
 
 void RigidBodySystem::ProcessCollision(const std::shared_ptr<RigidBody>& body1,
-                                       const std::shared_ptr<Triangle>& triangle1,
+                                       const std::shared_ptr<Triangle>& trig1,
                                        const std::shared_ptr<RigidBody>& body2,
-                                       const std::shared_ptr<Triangle>& triangle2) {
-    // TODO
-    float stiffness = 1.0e3f;
-    float damping = 10.0f;
-    float threshold = 1.0e-9f;
-    bool enable_spring = true;
-    bool enable_damping = true;
-
-    float distance = (body2->position_ - body1->position_).norm();
-    if (distance < 1) {
-        Eigen::Vector2f contact_point = 0.5f * (body1->position_ + body2->position_);
-        Eigen::Vector2f contact_normal = body2->position_ - body1->position_;
-        contact_normal.normalize();
-        contacts_.emplace_back(body1, body2, triangle1, triangle2, contact_normal, contact_point);
-
-        Eigen::Vector2f vel1 = body1->SpatialVelocity(contact_point);
-        Eigen::Vector2f vel2 = body2->SpatialVelocity(contact_point);
-        Eigen::Vector2f rel_vel = vel1 - vel2;
-        if (-rel_vel.dot(contact_normal) < threshold) {
-            if (enable_spring) {
-                float penetration_depth = distance - 1;
-                Eigen::Vector2f force = -penetration_depth * stiffness * contact_normal;
-                body2->AddContactForce(contact_point, force);
-                body1->AddContactForce(contact_point, -force);
-            }
-            if (enable_damping) {
-                Eigen::Vector2f force = rel_vel.dot(contact_normal) * damping * contact_normal;
-                body2->AddContactForce(contact_point, force);
-                body1->AddContactForce(contact_point, -force);
-            }
-        }
+                                       const std::shared_ptr<Triangle>& trig2) {
+    Contact ct;
+    if (contact_solver_.Intersect(body1, trig1, body2, trig2, ct)) {
+        std::cout << "In collision" << std::endl;
+        // TODO: Solve interpenetration
     }
 }
 

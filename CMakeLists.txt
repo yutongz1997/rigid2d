@@ -32,6 +32,7 @@ set(SOURCE_FILES
         "src/body.cpp"
         "src/bodysystem.cpp"
         "src/bvh.cpp"
+        "src/contact.cpp"
         "src/forces.cpp"
         "src/geometry.cpp"
         "src/scene.cpp"

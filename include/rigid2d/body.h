@@ -87,6 +87,10 @@ public:
         return local_to_world_.TransformPoint(p_local);
     }
 
+    [[nodiscard]] inline Vertex PointToWorld(const Vertex& p_local) const {
+        return local_to_world_.TransformPoint(p_local);
+    }
+
     [[nodiscard]] inline Eigen::Vector2f VectorToWorld(const Eigen::Vector2f& v_local) const {
         return local_to_world_.TransformVector(v_local);
     }

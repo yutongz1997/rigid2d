@@ -19,6 +19,8 @@ RIGID2D_NAMESPACE_BEGIN
 class RigidBodySystem {
 private:
     std::vector<std::shared_ptr<RigidBody>> bodies_;
+
+    GJKSolver contact_solver_;
     std::vector<Contact> contacts_;
 
     int visit_id_;
@@ -39,9 +41,9 @@ private:
                         const std::shared_ptr<BVHNode>& node2);
 
     void ProcessCollision(const std::shared_ptr<RigidBody>& body1,
-                          const std::shared_ptr<Triangle>& triangle1,
+                          const std::shared_ptr<Triangle>& trig1,
                           const std::shared_ptr<RigidBody>& body2,
-                          const std::shared_ptr<Triangle>& triangle2);
+                          const std::shared_ptr<Triangle>& trig2);
 
     void BroadPhase();
 

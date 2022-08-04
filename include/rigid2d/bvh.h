@@ -52,7 +52,7 @@ public:
     void UpdateCenterWorld();
 
     [[nodiscard]] inline bool IsInside(const Vertex& p_local) const {
-        return p_local.distanceSquared(center_local_) <= radius_ * radius_;
+        return p_local.DistanceSquared(center_local_) <= radius_ * radius_;
     }
 
     [[nodiscard]] inline bool IsInside(const Eigen::Vector2f& p_local) const {
@@ -89,7 +89,7 @@ public:
                      RigidBody* body);
 
     [[nodiscard]] inline bool IsLeaf() const {
-        return !leaf_triangle_;
+        return leaf_triangle_ != nullptr;
     }
 
     void Render(const std::shared_ptr<Shader>& disc_shader, const Eigen::Matrix4f& ortho) const;

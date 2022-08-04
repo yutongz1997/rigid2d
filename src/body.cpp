@@ -18,8 +18,8 @@ void RigidBody::ComputeRotationalInertia() {
         auto& v1 = geometry_->triangles_[i]->v1;
         auto& v2 = geometry_->triangles_[i]->v2;
         auto& v3 = geometry_->triangles_[i]->v3;
-        float unit_mmoi = (v1->dot(*v1) + v2->dot(*v2) + v3->dot(*v3) +
-                v1->dot(*v2) + v2->dot(*v3) + v1->dot(*v3)) / 6.0f;
+        float unit_mmoi = (v1->Dot(*v1) + v2->Dot(*v2) + v3->Dot(*v3) +
+                v1->Dot(*v2) + v2->Dot(*v3) + v1->Dot(*v3)) / 6.0f;
         rotational_inertia_ += geometry_->areas_[i] * unit_mmoi;
     }
     rotational_inertia_ *= (mass_ / geometry_->area_);

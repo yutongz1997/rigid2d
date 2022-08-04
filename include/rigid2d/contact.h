@@ -31,6 +31,8 @@ struct Contact {
     // Position of the contact point (in world coordinates)
     Eigen::Vector2f point;
 
+    Contact() = default;
+
     explicit Contact(const std::shared_ptr<RigidBody>& body1,
                      const std::shared_ptr<RigidBody>& body2,
                      const std::shared_ptr<Triangle>& triangle1,
@@ -44,6 +46,68 @@ struct Contact {
         this->normal = normal;
         this->point = point;
     }
+};
+
+
+class GJKSimplex {
+private:
+    std::vector<Eigen::Vector2f> vertices_;
+
+public:
+    GJKSimplex() = default;
+
+    inline Eigen::Vector2f LastVertex() const {
+        return vertices_[vertices_.size() - 1];
+    }
+
+    inline void Add(const Eigen::Vector2f& vert) {
+        vertices_.push_back(vert);
+    }
+
+    inline void Clear() {
+        vertices_.clear();
+    }
+
+    bool ContainsOrigin(Eigen::Vector2f& direction);
+};
+
+
+class GJKSolver {
+private:
+    int max_intersect_iterations_;
+    int max_distance_iterations_;
+    float distance_epsilon_;
+
+    GJKSimplex simplex_;
+
+public:
+    explicit GJKSolver(int max_intersect_iterations = 30,
+                       int max_distance_iterations = 30,
+                       float distance_epsilon = std::sqrt(kEpsilon)) {
+        max_intersect_iterations_ = max_intersect_iterations;
+        max_distance_iterations_ = max_distance_iterations;
+        distance_epsilon_ = distance_epsilon;
+    }
+
+    inline void SetMaxIntersectIterations(int max_intersect_iterations) {
+        max_intersect_iterations_ = max_intersect_iterations;
+    }
+
+    inline void SetMaxDistanceIterations(int max_distance_iterations) {
+        max_distance_iterations_ = max_distance_iterations;
+    }
+
+    bool Intersect(const std::shared_ptr<RigidBody>& body1,
+                   const std::shared_ptr<Triangle>& trig1,
+                   const std::shared_ptr<RigidBody>& body2,
+                   const std::shared_ptr<Triangle>& trig2,
+                   Contact& contact);
+
+    bool DistanceBetween(const std::shared_ptr<RigidBody>& body1,
+                         const std::shared_ptr<Triangle>& trig1,
+                         const std::shared_ptr<RigidBody>& body2,
+                         const std::shared_ptr<Triangle>& trig2,
+                         float& distance);
 };
 
 RIGID2D_NAMESPACE_END

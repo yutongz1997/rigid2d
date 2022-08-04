@@ -140,10 +140,10 @@ BVHNode::BVHNode(const std::vector<std::shared_ptr<Triangle>>& triangles,
 void BVHNode::Render(const std::shared_ptr<Shader>& disc_shader,
                      const Eigen::Matrix4f& ortho) const {
     volume_->Render(disc_shader, ortho);
-    if (left_child_) {
+    if (left_child_ != nullptr) {
         left_child_->Render(disc_shader, ortho);
     }
-    if (right_child_) {
+    if (right_child_ != nullptr) {
         right_child_->Render(disc_shader, ortho);
     }
 }

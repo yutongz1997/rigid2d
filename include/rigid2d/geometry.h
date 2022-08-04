@@ -18,7 +18,48 @@
 
 RIGID2D_NAMESPACE_BEGIN
 
+// Forward declarations
 class RigidBody;
+
+
+struct Vertex {
+    // X-coordinate of the vertex
+    float x;
+    // Y-coordinate of the vertex
+    float y;
+    // Index of the vertex in an array of vertices (optional)
+    int index;
+
+    explicit Vertex(float x, float y) : x(x), y(y) {
+        index = -1;
+    }
+
+    [[nodiscard]] inline float Dot(const Vertex& other) const {
+        return x * other.x + y * other.y;
+    }
+
+    [[nodiscard]] inline float Dot(const Eigen::Vector2f& other) const {
+        return x * other.x() + y * other.y();
+    }
+
+    [[nodiscard]] inline float DistanceSquared(const Vertex& other) const {
+        return Dot(other);
+    }
+
+    [[nodiscard]] inline float DistanceSquared(const Eigen::Vector2f& other) const {
+        float dx = other.x() - x;
+        float dy = other.y() - y;
+        return dx * dx + dy * dy;
+    }
+
+    [[nodiscard]] inline float distance(const Vertex& other) const {
+        return std::sqrt(DistanceSquared(other));
+    }
+
+    [[nodiscard]] inline float distance(const Eigen::Vector2f& other) const {
+        return std::sqrt(DistanceSquared(other));
+    }
+};
 
 
 class RigidTransformation {
@@ -62,6 +103,12 @@ public:
         return { q.x(), q.y() };
     }
 
+    [[nodiscard]] inline Vertex TransformPoint(const Vertex& p) const {
+        Eigen::Vector4f p_homogenous { p.x, p.y, 0.0f, 1.0f };
+        Eigen::Vector4f q = transformation_ * p_homogenous;
+        return Vertex(q.x(), q.y());
+    }
+
     [[nodiscard]] inline Eigen::Vector2f TransformVector(const Eigen::Vector2f& v) const {
         Eigen::Vector4f v_homogeneous { v.x(), v.y(), 0.0f, 0.0f };
         Eigen::Vector4f w = transformation_ * v_homogeneous;
@@ -70,42 +117,6 @@ public:
 
     [[nodiscard]] inline Eigen::Matrix4f TransformationMatrix() const {
         return transformation_;
-    }
-};
-
-
-struct Vertex {
-    // X-coordinate of the vertex
-    float x;
-    // Y-coordinate of the vertex
-    float y;
-    // Index of the vertex in an array of vertices (optional)
-    int index;
-
-    explicit Vertex(float x, float y) : x(x), y(y) {
-        index = -1;
-    }
-
-    [[nodiscard]] inline float dot(const Vertex& other) const {
-        return x * other.x + y * other.y;
-    }
-
-    [[nodiscard]] inline float distanceSquared(const Vertex& other) const {
-        return dot(other);
-    }
-
-    [[nodiscard]] inline float distanceSquared(const Eigen::Vector2f& other) const {
-        float dx = other.x() - x;
-        float dy = other.y() - y;
-        return dx * dx + dy * dy;
-    }
-
-    [[nodiscard]] inline float distance(const Vertex& other) const {
-        return std::sqrt(distanceSquared(other));
-    }
-
-    [[nodiscard]] inline float distance(const Eigen::Vector2f& other) const {
-        return std::sqrt(distanceSquared(other));
     }
 };
 
@@ -146,7 +157,7 @@ struct Circle {
         : center(center), radius(radius) { }
 
     [[nodiscard]] inline bool IsInside(const Vertex& v) const {
-        return v.distanceSquared(center) <= radius * radius;
+        return v.DistanceSquared(center) <= radius * radius;
     }
 
     static Circle WelzlCircle(const std::vector<std::shared_ptr<Vertex>>& vertices);
