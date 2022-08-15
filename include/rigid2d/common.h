@@ -34,6 +34,16 @@ static float Cross2(const Eigen::Vector2f& v1, const Eigen::Vector2f& v2) {
 }
 
 
+static Eigen::Vector2f LeftHandedNormal(const Eigen::Vector2f& v) {
+    return { v.y(), -v.x() };
+}
+
+
+static Eigen::Vector2f RightHandedNormal(const Eigen::Vector2f& v) {
+    return { -v.y(), v.x() };
+}
+
+
 static Eigen::Vector2f VectorTripleProduct(const Eigen::Vector2f& v1,
                                            const Eigen::Vector2f& v2,
                                            const Eigen::Vector2f& v3) {

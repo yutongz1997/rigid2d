@@ -35,10 +35,23 @@ void RigidBodySystem::ProcessCollision(const std::shared_ptr<RigidBody>& body1,
                                        const std::shared_ptr<Triangle>& trig1,
                                        const std::shared_ptr<RigidBody>& body2,
                                        const std::shared_ptr<Triangle>& trig2) {
-    Contact ct;
+    ContactManifold ct;
     if (contact_solver_.Intersect(body1, trig1, body2, trig2, ct)) {
-        std::cout << "In collision" << std::endl;
-        // TODO: Solve interpenetration
+        // TODO: Collision response
+        float k = 1000.0f;
+        float c1 = 10.0f;
+        float threshold = 0.001f;
+
+        Eigen::Vector2f v1 = body1->SpatialVelocity(ct.points[0].point);
+        Eigen::Vector2f v2 = body2->SpatialVelocity(ct.points[0].point);
+        Eigen::Vector2f rel_vel = v1 - v2;
+
+        Eigen::Vector2f force = k * ct.points[0].penetration_depth * ct.normal;
+        body1->AddContactForce(ct.points[0].point, force);
+        body2->AddContactForce(ct.points[0].point, -force);
+        force = c1 * rel_vel.dot(ct.normal) * ct.normal;
+        body2->AddContactForce(ct.points[0].point, force);
+        body1->AddContactForce(ct.points[0].point, -force);
     }
 }
 

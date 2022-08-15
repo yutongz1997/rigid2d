@@ -21,7 +21,7 @@ private:
     std::vector<std::shared_ptr<RigidBody>> bodies_;
 
     GJKSolver contact_solver_;
-    std::vector<Contact> contacts_;
+    std::vector<ContactManifold> contacts_;
 
     int visit_id_;
 

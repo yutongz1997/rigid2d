@@ -52,12 +52,16 @@ struct Vertex {
         return dx * dx + dy * dy;
     }
 
-    [[nodiscard]] inline float distance(const Vertex& other) const {
+    [[nodiscard]] inline float Distance(const Vertex& other) const {
         return std::sqrt(DistanceSquared(other));
     }
 
-    [[nodiscard]] inline float distance(const Eigen::Vector2f& other) const {
+    [[nodiscard]] inline float Distance(const Eigen::Vector2f& other) const {
         return std::sqrt(DistanceSquared(other));
+    }
+
+    friend Eigen::Vector2f operator-(const Vertex& v1, const Vertex& v2) {
+        return { v1.x - v2.x, v1.y - v2.y };
     }
 };
 

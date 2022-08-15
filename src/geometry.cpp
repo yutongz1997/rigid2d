@@ -41,7 +41,7 @@ Circle TwoVerticesCircle(const std::shared_ptr<Vertex>& v1,
                          const std::shared_ptr<Vertex>& v2) {
     Eigen::Vector2f center { 0.5f * (v1->x + v2->x),
                              0.5f * (v1->y + v2->y) };
-    float radius = v1->distance(center);
+    float radius = v1->Distance(center);
     return { center, radius };
 }
 
@@ -59,9 +59,9 @@ Circle ThreeVerticesCircle(const std::shared_ptr<Vertex>& v1,
     // In case the three given vertices are co-linear, the enclosing circle is
     // degenerate and only passes through two vertices
     if (det == 0) {
-        float d12 = v1->distance(*v2);
-        float d23 = v2->distance(*v3);
-        float d13 = v1->distance(*v3);
+        float d12 = v1->Distance(*v2);
+        float d23 = v2->Distance(*v3);
+        float d13 = v1->Distance(*v3);
         if (d12 > d23 && d12 > d13) {
             return TwoVerticesCircle(v1, v2);
         } else if (d23 > d13) {
@@ -71,7 +71,7 @@ Circle ThreeVerticesCircle(const std::shared_ptr<Vertex>& v1,
     } else {
         Eigen::Vector2f center { (d * e - b * f) / det,
                                  (-c * e + a * f) / det };
-        float radius = v1->distance(center);
+        float radius = v1->Distance(center);
         return { center, radius };
     }
 }
