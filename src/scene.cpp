@@ -77,14 +77,26 @@ void Scene::LoadShaders() {
                             "uniform mat4 model;\n"
                             "uniform mat4 projection;\n"
                             "void main() {\n"
-                            "   gl_Position = projection * model * vec4(v_position, 0.0f, 1.0f);\n"
+                            "    gl_Position = projection * model * vec4(v_position, 0.0f, 1.0f);\n"
                             "}";
     std::string circ_frag = "#version 410 core\n"
                             "out vec4 frag_color;\n"
                             "void main() {\n"
                             "    frag_color = vec4(1.0f, 0.0f, 0.0f, 1.0f);\n"
                             "}";
+    std::string contact_vert = "#version 410 core\n"
+                               "layout (location = 0) in vec2 v_position;\n"
+                               "uniform mat4 projection;\n"
+                               "void main() {\n"
+                               "    gl_Position = projection * vec4(v_position, 0.0f, 1.0f);\n"
+                               "}";
+    std::string contact_frag = "#version 410 core\n"
+                               "out vec4 frag_color;\n"
+                               "void main() {\n"
+                               "    frag_color = vec4(0.0f, 1.0f, 0.0f, 1.0f);\n"
+                               "}";
     circ_shader_ = std::make_shared<Shader>(circ_vert, circ_frag, 's');
+    contact_shader_ = std::make_shared<Shader>(contact_vert, contact_frag);
 }
 
 
@@ -141,7 +153,8 @@ Scene::Scene(const std::string &path) {
 }
 
 
-void Scene::Render(const Eigen::Matrix4f& ortho) {
+void Scene::Render(const Eigen::Matrix4f& ortho,
+                   bool draw_bvh, bool draw_normal) {
     if (!valid_) {
         fmt::print(stderr,
                    "[Scene] Error: Failed to render as the scene is invalid.\n");
@@ -159,8 +172,16 @@ void Scene::Render(const Eigen::Matrix4f& ortho) {
                        GL_UNSIGNED_INT, nullptr);
         glBindVertexArray(0);
 
-        // body->bvh_root_->Render(circ_shader_, ortho);
-        body->bvh_root_->RenderVisitBoundary(circ_shader_, ortho, body_system_.visit_id_);
+        if (draw_bvh) {
+            // body->bvh_root_->Render(circ_shader_, ortho);
+            body->bvh_root_->RenderVisitBoundary(circ_shader_, ortho, body_system_.visit_id_);
+        }
+    }
+
+    if (draw_normal) {
+        for (Contact &ct: body_system_.contacts_) {
+            ct.Render(contact_shader_, ortho);
+        }
     }
 }
 

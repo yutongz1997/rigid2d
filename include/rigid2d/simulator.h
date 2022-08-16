@@ -24,11 +24,21 @@ private:
 
     std::unique_ptr<Scene> scene_;
     Eigen::Matrix4f ortho_;
+
     bool running_;
+    bool wireframe_;
+    bool draw_bvh_;
+    bool draw_contact_normal_;
+    float dt_;
 
 private:
     bool InitWindow(int width, int height);
     void DestroyWindow();
+
+    void InitImGui();
+    void DestroyImGui();
+
+    void ShowControlPanel();
 
     void ProcessKeyboardInput();
 

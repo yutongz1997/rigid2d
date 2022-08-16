@@ -1,5 +1,4 @@
 #include <cstdio>
-#include <cmath>
 #include <fstream>
 #include <vector>
 #include <memory>

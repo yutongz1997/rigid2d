@@ -16,37 +16,69 @@
 
 RIGID2D_NAMESPACE_BEGIN
 
-struct ContactPoints {
-    //
-    Eigen::Vector2f point;
-    //
-    float penetration_depth;
+struct ContactPair {
+    // First rigid body in contact
+    std::shared_ptr<RigidBody> body1;
+    // Corresponding triangle of the first body in contact
+    std::shared_ptr<Triangle> triangle1;
 
-    explicit ContactPoints(const Eigen::Vector2f& point,
-                           float penetration_depth)
-        : point(point), penetration_depth(penetration_depth) { }
+    // Second rigid body in contact
+    std::shared_ptr<RigidBody> body2;
+    // Corresponding triangle of the second body in contact
+    std::shared_ptr<Triangle> triangle2;
+
+    ContactPair() = default;
+
+    explicit ContactPair(std::shared_ptr<RigidBody> body1,
+                         std::shared_ptr<Triangle> triangle1,
+                         std::shared_ptr<RigidBody> body2,
+                         std::shared_ptr<Triangle> triangle2) {
+        this->body1 = std::move(body1);
+        this->triangle1 = std::move(triangle1);
+        this->body2 = std::move(body2);
+        this->triangle2 = std::move(triangle2);
+    }
 };
 
 
-struct ContactManifold {
-    // First rigid body in contact
-    std::shared_ptr<RigidBody> body1;
-    // Second rigid body in contact
-    std::shared_ptr<RigidBody> body2;
+struct Contact {
+    //
+    GLuint vao_;
+    //
+    std::vector<GLfloat> vertex_buffer_;
 
-    // Triangle of the first body in contact
-    std::shared_ptr<Triangle> triangle1;
-    // Triangle of the second body in contact
-    std::shared_ptr<Triangle> triangle2;
-
+    //
+    ContactPair pair;
     // Contact normal (in world coordinates)
     Eigen::Vector2f normal;
     // Penetration depth
     float penetration_depth;
-    // Positions of the contact points (in world coordinates)
-    std::vector<ContactPoints> points;
+    // Position of the contact point (in world coordinates)
+    Eigen::Vector2f point;
 
-    ContactManifold() : penetration_depth(0.0f) { }
+    explicit Contact(const ContactPair& pair,
+                     Eigen::Vector2f normal,
+                     float penetration_depth,
+                     Eigen::Vector2f point) {
+        this->pair = pair;
+        this->normal = std::move(normal);
+        this->penetration_depth = penetration_depth;
+        this->point = std::move(point);
+
+        vao_ = 0;
+        BuildDrawingBuffer();
+    }
+
+    void BuildDrawingBuffer();
+
+    void Render(const std::shared_ptr<Shader>& contact_shader,
+                const Eigen::Matrix4f& ortho) const;
+};
+
+
+struct Penetration {
+    Eigen::Vector2f normal;
+    float depth;
 };
 
 
@@ -147,7 +179,8 @@ public:
          : max_iterations_(max_iterations), distance_epsilon_(distance_epsilon) { }
 
     void FindPenetration(const GJKSimplex& simplex,
-                         ContactManifold& contact) const;
+                         const ContactPair& pair,
+                         Penetration& penetration) const;
 };
 
 
@@ -162,7 +195,7 @@ private:
     ExpandingPolygonSolver epa_solver_;
 
 public:
-    explicit GJKSolver(int max_intersect_iterations = 30,
+    explicit GJKSolver(int max_intersect_iterations = 50,
                        int max_distance_iterations = 30,
                        float distance_epsilon = std::sqrt(kEpsilon)) {
         max_intersect_iterations_ = max_intersect_iterations;
@@ -178,16 +211,10 @@ public:
         max_distance_iterations_ = max_distance_iterations;
     }
 
-    bool Intersect(const std::shared_ptr<RigidBody>& body1,
-                   const std::shared_ptr<Triangle>& trig1,
-                   const std::shared_ptr<RigidBody>& body2,
-                   const std::shared_ptr<Triangle>& trig2,
-                   ContactManifold& contact);
+    bool Intersect(const ContactPair& pair,
+                   std::vector<Contact>& contacts);
 
-    bool DistanceBetween(const std::shared_ptr<RigidBody>& body1,
-                         const std::shared_ptr<Triangle>& trig1,
-                         const std::shared_ptr<RigidBody>& body2,
-                         const std::shared_ptr<Triangle>& trig2,
+    bool DistanceBetween(const ContactPair& pair,
                          float& distance);
 };
 
@@ -197,10 +224,13 @@ struct EdgeFeature {
     Eigen::Vector2f v2;
     Eigen::Vector2f max;
 
-    explicit EdgeFeature(const Eigen::Vector2f& v1,
-                         const Eigen::Vector2f& v2,
-                         const Eigen::Vector2f& max)
-         : v1(v1), v2(v2), max(max) { }
+    explicit EdgeFeature(Eigen::Vector2f v1,
+                         Eigen::Vector2f v2,
+                         Eigen::Vector2f max) {
+        this->v1 = std::move(v1);
+        this->v2 = std::move(v2);
+        this->max = std::move(max);
+    }
 
     [[nodiscard]] inline Eigen::Vector2f AsVector() const {
         return v2 - v1;
@@ -210,7 +240,9 @@ struct EdgeFeature {
 
 class SutherlandHodgmanSolver {
 public:
-    static bool FindContactPoints(ContactManifold& contact);
+    static bool FindContactPoints(const Penetration& penetration,
+                                  const ContactPair& pair,
+                                  std::vector<Contact>& contacts);
 };
 
 RIGID2D_NAMESPACE_END

@@ -52,6 +52,8 @@ private:
     std::unordered_map<std::string, std::shared_ptr<Shader>> shaders_;
     //
     std::shared_ptr<Shader> circ_shader_;
+    //
+    std::shared_ptr<Shader> contact_shader_;
     // System of rigid bodies in the scene
     RigidBodySystem body_system_;
 
@@ -79,7 +81,8 @@ public:
         return valid_;
     }
 
-    void Render(const Eigen::Matrix4f& ortho);
+    void Render(const Eigen::Matrix4f& ortho,
+                bool draw_bvh, bool draw_normal);
 };
 
 RIGID2D_NAMESPACE_END

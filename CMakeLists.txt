@@ -18,6 +18,7 @@ find_package(Eigen3 CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 
 # Enable math constants when compiling with Microsoft Visual C++
@@ -47,4 +48,6 @@ target_link_libraries(rigid2d PRIVATE fmt::fmt
                                       Eigen3::Eigen
                                       nlohmann_json::nlohmann_json
                                       glad::glad
-                                      glfw glm::glm)
+                                      glfw
+                                      imgui::imgui
+                                      glm::glm)

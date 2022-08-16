@@ -8,6 +8,34 @@
 
 RIGID2D_NAMESPACE_BEGIN
 
+void Contact::BuildDrawingBuffer() {
+    glGenVertexArrays(1, &vao_);
+    GLuint vbo;
+    glGenBuffers(1, &vbo);
+
+    glBindVertexArray(vao_);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+    vertex_buffer_.push_back(point.x());
+    vertex_buffer_.push_back(point.y());
+    vertex_buffer_.push_back(point.x() + normal.x());
+    vertex_buffer_.push_back(point.y() + normal.y());
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(4 * sizeof(GLfloat)),
+                 &vertex_buffer_[0], GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), nullptr);
+    glEnableVertexAttribArray(0);
+}
+
+
+void Contact::Render(const std::shared_ptr<Shader>& contact_shader,
+                     const Eigen::Matrix4f& ortho) const {
+    contact_shader->Use();
+    contact_shader->SetMatrix4f("projection", ortho);
+    glBindVertexArray(vao_);
+    glDrawArrays(GL_LINES, 0, 2);
+}
+
+
 Eigen::Vector2f ComputeInitialDirection(const Triangle& trig1,
                                         const Triangle& trig2) {
     return trig2.centroid - trig1.centroid;
@@ -101,9 +129,10 @@ void ExpandingSimplex::Expand(const Eigen::Vector2f& p) {
 
 
 void ExpandingPolygonSolver::FindPenetration(const GJKSimplex& simplex,
-                                             ContactManifold& contact) const {
-    Triangle trig1_transformed = TransformTriangle(contact.triangle1, contact.body1);
-    Triangle trig2_transformed = TransformTriangle(contact.triangle2, contact.body2);
+                                             const ContactPair& pair,
+                                             Penetration& penetration) const {
+    Triangle trig1_transformed = TransformTriangle(pair.triangle1, pair.body1);
+    Triangle trig2_transformed = TransformTriangle(pair.triangle2, pair.body2);
     ExpandingSimplex exp_simplex(simplex);
 
     for (int i = 0; i < max_iterations_; ++i) {
@@ -112,8 +141,8 @@ void ExpandingPolygonSolver::FindPenetration(const GJKSimplex& simplex,
         float dist = p.dot(e.normal);
 
         //
-        contact.normal = e.normal;
-        contact.penetration_depth = dist;
+        penetration.normal = e.normal;
+        penetration.depth = dist;
         if (dist - e.distance < distance_epsilon_) {
             break;
         }
@@ -153,16 +182,13 @@ bool GJKSimplex::ContainsOrigin(Eigen::Vector2f &direction) {
 }
 
 
-bool GJKSolver::Intersect(const std::shared_ptr<RigidBody>& body1,
-                          const std::shared_ptr<Triangle>& trig1,
-                          const std::shared_ptr<RigidBody>& body2,
-                          const std::shared_ptr<Triangle>& trig2,
-                          ContactManifold& contact) {
+bool GJKSolver::Intersect(const ContactPair& pair,
+                          std::vector<Contact>& contacts) {
     // Reference: https://github.com/dyn4j/dyn4j/blob/master/src/main/java/org/dyn4j/collision/narrowphase/Gjk.java
 
     //
-    Triangle trig1_transformed = TransformTriangle(trig1, body1);
-    Triangle trig2_transformed = TransformTriangle(trig2, body2);
+    Triangle trig1_transformed = TransformTriangle(pair.triangle1, pair.body1);
+    Triangle trig2_transformed = TransformTriangle(pair.triangle2, pair.body2);
     Eigen::Vector2f d = ComputeInitialDirection(trig1_transformed, trig2_transformed);
     if (d.isZero()) {
         d = { 1.0f, 0.0f };
@@ -181,12 +207,9 @@ bool GJKSolver::Intersect(const std::shared_ptr<RigidBody>& body1,
             return false;
         } else {
             if (simplex_.ContainsOrigin(d)) {
-                contact.body1 = body1;
-                contact.triangle1 = trig1;
-                contact.body2 = body2;
-                contact.triangle2 = trig2;
-                epa_solver_.FindPenetration(simplex_, contact);
-                SutherlandHodgmanSolver::FindContactPoints(contact);
+                Penetration penetration;
+                epa_solver_.FindPenetration(simplex_, pair, penetration);
+                SutherlandHodgmanSolver::FindContactPoints(penetration, pair, contacts);
                 return true;
             }
         }
@@ -196,16 +219,13 @@ bool GJKSolver::Intersect(const std::shared_ptr<RigidBody>& body1,
 }
 
 
-bool GJKSolver::DistanceBetween(const std::shared_ptr<RigidBody>& body1,
-                                const std::shared_ptr<Triangle>& trig1,
-                                const std::shared_ptr<RigidBody>& body2,
-                                const std::shared_ptr<Triangle>& trig2,
+bool GJKSolver::DistanceBetween(const ContactPair& pair,
                                 float& distance) {
     // Reference: https://github.com/dyn4j/dyn4j/blob/master/src/main/java/org/dyn4j/collision/narrowphase/Gjk.java
 
     // TODO: Check validity
-    Triangle trig1_transformed = TransformTriangle(trig1, body1);
-    Triangle trig2_transformed = TransformTriangle(trig2, body2);
+    Triangle trig1_transformed = TransformTriangle(pair.triangle1, pair.body1);
+    Triangle trig2_transformed = TransformTriangle(pair.triangle2, pair.body2);
     Eigen::Vector2f d = ComputeInitialDirection(trig1_transformed, trig2_transformed);
 
     if (d.isZero()) {
@@ -315,13 +335,16 @@ std::vector<Eigen::Vector2f> Clip(const Eigen::Vector2f& v1,
 }
 
 
-bool SutherlandHodgmanSolver::FindContactPoints(ContactManifold& contact) {
-    EdgeFeature e1 = FindFarthestEdgeFeature(contact.body1, contact.triangle1, contact.normal);
-    EdgeFeature e2 = FindFarthestEdgeFeature(contact.body2, contact.triangle2, -contact.normal);
+bool SutherlandHodgmanSolver::FindContactPoints(const Penetration& penetration,
+                                                const ContactPair& pair,
+                                                std::vector<Contact>& contacts) {
+    EdgeFeature e1 = FindFarthestEdgeFeature(pair.body1, pair.triangle1, penetration.normal);
+    EdgeFeature e2 = FindFarthestEdgeFeature(pair.body2, pair.triangle2, -penetration.normal);
 
     EdgeFeature reference = e1, incident = e2;
     bool flipped = false;
-    if (std::abs(e1.AsVector().dot(contact.normal)) > std::abs(e2.AsVector().dot(contact.normal))) {
+    if (std::abs(e1.AsVector().dot(penetration.normal)) >
+        std::abs(e2.AsVector().dot(penetration.normal))) {
         reference = e2;
         incident = e1;
         flipped = true;
@@ -342,16 +365,16 @@ bool SutherlandHodgmanSolver::FindContactPoints(ContactManifold& contact) {
 
     Eigen::Vector2f front_normal = RightHandedNormal(ref_vect);
     float front_offset = reference.max.dot(front_normal);
-    contact.normal = flipped ? -front_normal : front_normal;
+    Eigen::Vector2f contact_normal = flipped ? -front_normal : front_normal;
 
     for (Eigen::Vector2f& point : clip2) {
         float depth = point.dot(front_normal) - front_offset;
         if (depth >= 0.0f) {
-            contact.points.emplace_back(point, depth);
+            contacts.emplace_back(pair, contact_normal, depth, point);
         }
     }
 
-    if (contact.points.empty()) {
+    if (contacts.empty()) {
         return false;
     }
     return true;
